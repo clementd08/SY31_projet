@@ -19,7 +19,6 @@ class CameraNode:
 
         # Subscriber to the input topic. self.callback is called when a message is received
         self.subscriber_info = rospy.Subscriber('/turtlebotcam/camera_info', CameraInfo, self.callback_cam_info)
-        # self.subscriber_imag = rospy.Subscriber('/camera/image_rect_color', Image, self.callback, queue_size=1)
         
         rospy.loginfo("carmera node started !")
 
