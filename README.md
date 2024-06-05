@@ -27,3 +27,9 @@ To launch all nodes at once :
 ``` bash
 roslaunch ros_labyrinth_sy15 robot.launch
 ```
+
+```
+catkin_make # Construit le workspace
+source devel/setup.bash # Charge les nodes et messages dans le terminal
+```
+
