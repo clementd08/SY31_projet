@@ -9,7 +9,7 @@ from sensor_msgs.msg import Image, CameraInfo
 class CameraNode:
     def __init__(self):
         # Creates a node called and registers it to the ROS master
-        rospy.init_node('camera node starting')
+        rospy.init_node('camera_node')
 
         # CvBridge is used to convert ROS messages to matrices manipulable by OpenCV
         self.bridge = CvBridge()
@@ -18,7 +18,9 @@ class CameraNode:
         self.pub_img = rospy.Publisher('~output', Image, queue_size=1)
 
         # Subscriber to the input topic. self.callback is called when a message is received
-        self.subscriber_info = rospy.Subscriber('/turtlebotcam/camera_info', CameraInfo, self.callback_cam_info)
+        self.subscriber_info = rospy.Subscriber('/turtlebotcam/image_raw', Image, self.image_callback)
+        
+        # début tp4 (lancer camera launch)
         
         rospy.loginfo("carmera node started !")
 
@@ -45,8 +47,8 @@ class CameraNode:
 
         # [rouge, vert, bleu]
         # masque bleue
-        min_bleu = np.array([0, 0, 255])
-        max_bleu = np.array([125, 125, 255])
+        min_bleu = np.array([0, 0, 125])
+        max_bleu = np.array([80, 80, 255])
         mask = cv2.inRange(img_hsv, min_bleu, max_bleu)
 
         # nombre de pixels bleu
@@ -56,7 +58,7 @@ class CameraNode:
 
         # masque rouge 
         min_rouge = np.array([150, 0, 0])
-        max_rouge = np.array([255, 125, 125])
+        max_rouge = np.array([255, 80, 80])
 
         mask = cv2.inRange(img_hsv, min_rouge, max_rouge)
 
@@ -75,12 +77,12 @@ class CameraNode:
             if nb_pixel_rouge > min_pixel :
                 print("Flèche Rouge, aller à gauche")
         
-        elif fleche_rouge:
+        elif not fleche_rouge:
             if nb_pixel_bleu > min_pixel :
                 print("Flèche Bleu, aller à droite")
         
         else : 
-            print("aucune fleche détecté")
+            print("aucune fleche detecte")
 
         # Convert OpenCV -> ROS Image and publish
         try:
