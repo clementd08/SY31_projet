@@ -4,7 +4,7 @@ import rospy
 import numpy as np
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-from sensor_msgs.msg import Image, CameraInfo
+from sensor_msgs.msg import Image, CameraInfo, LaserScan
 
 class CameraNode:
     def __init__(self):
@@ -17,12 +17,29 @@ class CameraNode:
         # Publisher to the output topics.
         self.pub_img = rospy.Publisher('~output', Image, queue_size=1)
 
-        # Subscriber to the input topic. self.callback is called when a message is received
-        self.subscriber_info = rospy.Subscriber('/turtlebotcam/image_raw', Image, self.image_callback)
         
+        self.last_distance = 1
+        self.range_min = 0.25
+
+        self.proche_mur = True
+
+        self.lidar_subscriber = rospy.Subscriber("/scan", LaserScan, self.distance_wall)
+        
+        # Subscriber to the input topic. self.callback is called when a message is received
+        self.subscriber_info = rospy.Subscriber('/image', Image, self.image_callback)
+
         # début tp4 (lancer camera launch)
         
         rospy.loginfo("carmera node started !")
+
+
+    def distance_wall(self, msg):
+        self.last_distance = msg.ranges[0]
+
+        # print("distance wall")
+        # print(self.range_min)
+        # print(self.last_distance)
+        # print("\n")
 
 
     def image_callback(self, msg):
@@ -32,6 +49,7 @@ class CameraNode:
         img: Width*Height*3 Numpy matrix storing the image
         '''
         
+        # print("\n")
         # min de pixel
         min_pixel = 500
         
@@ -47,24 +65,24 @@ class CameraNode:
 
         # [rouge, vert, bleu]
         # masque bleue
-        min_bleu = np.array([0, 0, 125])
-        max_bleu = np.array([80, 80, 255])
+        min_bleu = np.array([100, 50, 50])
+        max_bleu = np.array([140, 255, 255])
         mask = cv2.inRange(img_hsv, min_bleu, max_bleu)
 
         # nombre de pixels bleu
         nb_pixel_bleu = cv2.countNonZero(mask)
-        print("nombre de pixel bleu: ", nb_pixel_bleu)
+        # print("nombre de pixel bleu: ", nb_pixel_bleu)
 
 
         # masque rouge 
-        min_rouge = np.array([150, 0, 0])
-        max_rouge = np.array([255, 80, 80])
+        min_rouge = np.array([0, 50, 50])
+        max_rouge = np.array([10, 255, 255])
 
         mask = cv2.inRange(img_hsv, min_rouge, max_rouge)
 
         # nombre de pixels rouge
         nb_pixel_rouge = cv2.countNonZero(mask)
-        print("nombre de pixel rouge: ", nb_pixel_rouge)
+        # print("nombre de pixel rouge: ", nb_pixel_rouge)
 
 
         # selection du max de pixel
@@ -75,14 +93,33 @@ class CameraNode:
         
         if fleche_rouge:
             if nb_pixel_rouge > min_pixel :
-                print("Flèche Rouge, aller à gauche")
+                affichage = "Flèche Rouge, aller à droite"
         
         elif not fleche_rouge:
             if nb_pixel_bleu > min_pixel :
-                print("Flèche Bleu, aller à droite")
+                affichage = "Flèche Bleu, aller à gauche"
         
         else : 
-            print("aucune fleche detecte")
+            affichage = "aucune fleche detecte"
+
+
+        # print(self.last_distance)
+        # print(self.range_min)
+        # print("\n")
+
+        if self.last_distance < self.range_min and self.last_distance !=0:
+            if self.proche_mur :
+                print(affichage)
+                print("nombre de pixel bleu: ", nb_pixel_bleu)
+                print("nombre de pixel rouge: ", nb_pixel_rouge)
+                print(self.last_distance)
+                print("\n")
+            self.proche_mur = False
+        
+        else :
+            self.proche_mur = True
+
+            
 
         # Convert OpenCV -> ROS Image and publish
         try:
@@ -90,7 +127,12 @@ class CameraNode:
         except CvBridgeError as e:
             rospy.logwarn(e)
 
+
 if __name__ == '__main__':
     # Start the node and wait until it receives a message or stopped by Ctrl+C
     node = CameraNode()
-    rospy.spin()
+    try:
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        pass
+
