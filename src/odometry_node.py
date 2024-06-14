@@ -29,12 +29,12 @@ class Odom2PoseNode:
         self.ENCODER_RESOLUTION = 4096
         self.WHEEL_RADIUS = 0.033
         self.WHEEL_SEPARATION = 0.160
-        self.MAG_OFFSET = np.pi/2.0-0.07
+        # self.MAG_OFFSET = np.pi/2.0-0.07
 
         # Variables
         self.x_odom, self.y_odom, self.O_odom = 0, 0, 0
         self.x_gyro, self.y_gyro, self.O_gyro = 0, 0, 0
-        self.x_magn, self.y_magn, self.O_magn = 0, 0, 0
+        # self.x_magn, self.y_magn, self.O_magn = 0, 0, 0
         self.prev_left_encoder = 0
         self.prev_right_encoder = 0
         self.prev_gyro_t = 0
@@ -43,12 +43,18 @@ class Odom2PoseNode:
         # Publishers
         self.pub_enco = rospy.Publisher('/pose_enco', PoseStamped, queue_size=10)
         self.pub_gyro = rospy.Publisher('/pose_gyro', PoseStamped, queue_size=10)
-        self.pub_magn = rospy.Publisher('/pose_magn', PoseStamped, queue_size=10)
+        # self.pub_magn = rospy.Publisher('/pose_magn', PoseStamped, queue_size=10)
 
         # Subscribers
         self.sub_gyro = rospy.Subscriber('/imu', Imu, self.callback_gyro)
         self.sub_enco = rospy.Subscriber('/sensor_state', SensorState, self.callback_enco)
-        self.sub_magn = rospy.Subscriber('/magnetic_field', MagneticField, self.callback_magn)
+        # self.sub_magn = rospy.Subscriber('/magnetic_field', MagneticField, self.callback_magn)
+
+        self.pub_estimate_pose = rospy.Publisher('/estimate_pose', PoseStamped, queue_size = 10)
+
+        rospy.Timer(rospy.Duration(0.1),self.callback_pub)
+
+        rospy.loginfo("odometry node started !")
 
     def callback_enco(self, sensor_state):
         # Compute the differential in encoder count
@@ -62,18 +68,18 @@ class Odom2PoseNode:
         self.prev_left_encoder = sensor_state.left_encoder
         
         
-        phi_r = d_right_encoder * np.pi/self.ENCODER_RESOLUTION/2
-        phi_l = d_left_encoder * np.pi/self.ENCODER_RESOLUTION/2
+        phi_r = d_right_encoder * 2*np.pi/self.ENCODER_RESOLUTION
+        phi_l = d_left_encoder * 2*np.pi/self.ENCODER_RESOLUTION
         # TODO: Compute the linear and angular velocity (self.v and w)
-        v_r = 2* np.pi* self.WHEEL_RADIUS  * phi_r
-        v_l = 2 * np.pi* self.WHEEL_RADIUS  * phi_l 
+        v_r = self.WHEEL_RADIUS  * phi_r #/np.pi
+        v_l = self.WHEEL_RADIUS  * phi_l #/np.pi
         
         self.v = (v_r + v_l)/2
-        self.w = (v_r - v_l)/ (self.WHEEL_SEPARATION*2)
+        self.w = (v_r - v_l)/ (self.WHEEL_SEPARATION)
 
         # TODO: Update x_odom, y_odom and O_odom accordingly
-        self.x_odom = np.cos(self.O_odom)*self.v +self.x_odom
-        self.y_odom = np.sin(self.O_odom)*self.v +self.y_odom
+        self.x_odom = np.cos(self.O_gyro)*self.v +self.x_odom
+        self.y_odom = np.sin(self.O_gyro)*self.v +self.y_odom
         self.O_odom = self.O_odom + self.w
         
         
@@ -103,21 +109,35 @@ class Odom2PoseNode:
         msg = coordinates_to_message(self.x_gyro, self.y_gyro, self.O_gyro, gyro.header.stamp)
         self.pub_gyro.publish(msg)
 
-    def callback_magn(self, magnetic_field):
-        if self.v == 0:
-            return
+    def callback_pub(self, event):
 
-        # TODO: compute the angle O_magn from magnetic fields (using MAG_OFFSET)
-        self.O_magn = np.arctan2(magnetic_field.magnetic_field.y, magnetic_field.magnetic_field.x) + self.MAG_OFFSET
-        
-        # TODO: update O_magn, x_magn and y_magn accordingly (using self.v)
-        
-        self.x_magn = np.cos(self.O_magn)*self.v +self.x_magn
-        self.y_magn = np.sin(self.O_magn)*self.v +self.y_magn
-        self.O_magn = self.O_magn + self.w
+        pose = [0, 0, 0]
+        pose[0] = self.x_odom
+        pose[1] = self.y_odom
+        pose[2] = self.O_gyro
 
-        msg = coordinates_to_message(self.x_magn, self.y_magn, self.O_magn, magnetic_field.header.stamp)
-        self.pub_magn.publish(msg)
+        # Publish the final pose
+        msg = coordinates_to_message(pose[0], pose[1], pose[2], rospy.Time.now())
+        self.pub_estimate_pose.publish(msg)
+
+        # msg = coordinates_to_message(self.x_odom, self.y_odom, self.O_gyro, rospy.Time.now())
+        # self.pub_estimate_pose.publish(msg)
+
+    # def callback_magn(self, magnetic_field):
+    #     if self.v == 0:
+    #         return
+
+    #     # TODO: compute the angle O_magn from magnetic fields (using MAG_OFFSET)
+    #     self.O_magn = np.arctan2(magnetic_field.magnetic_field.y, magnetic_field.magnetic_field.x) + self.MAG_OFFSET
+        
+    #     # TODO: update O_magn, x_magn and y_magn accordingly (using self.v)
+        
+    #     self.x_magn = np.cos(self.O_magn)*self.v +self.x_magn
+    #     self.y_magn = np.sin(self.O_magn)*self.v +self.y_magn
+    #     self.O_magn = self.O_magn + self.w
+
+    #     msg = coordinates_to_message(self.x_magn, self.y_magn, self.O_magn, magnetic_field.header.stamp)
+    #     self.pub_magn.publish(msg)
 
 
 if __name__ == '__main__':

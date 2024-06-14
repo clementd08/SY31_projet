@@ -30,7 +30,7 @@ class CameraNode:
 
         # début tp4 (lancer camera launch)
         
-        rospy.loginfo("carmera node started !")
+        rospy.loginfo("camera node started !")
 
 
     def distance_wall(self, msg):

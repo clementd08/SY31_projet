@@ -10,29 +10,30 @@ from math import cos, sin, atan2
 
 class Costmap_node:
     def __init__(self):
-        rospy.init_node("costmap node", log_level=rospy.INFO)
+        rospy.init_node("costmap node")
         rospy.loginfo("Starting costmap node...")
 
         # sub to the current position
-        self.estimate_pose_subscriber = rospy.Subscriber("/pose_enco", PoseStamped, self.receive_estimated_pose)
+        self.estimate_pose_subscriber = rospy.Subscriber("/estimate_pose", PoseStamped, self.receive_estimate_pose)
         self.current_pose = np.array([0., 0., 0.]) # x, y, theta
 
         # sub to the lidar
         self.lidar_subscriber = rospy.Subscriber("/scan", LaserScan, self.receive_lidar)
 
-        # pub the costmap
-        self.costmap_publisher = rospy.Publisher("/costmap", OccupancyGrid, queue_size=1)
 
         # costmap
-        self.costmap_size = 200  # points
-        self.resolution = 0.05 # 5cm
-        self.obstacle_layer = np.zeros((self.costmap_size, self.costmap_size), dtype=np.int8)
+        self.costmap_size = 300  # points
+        self.resolution = 0.01 # 1cm
+        self.costmap = np.zeros((self.costmap_size, self.costmap_size), dtype=np.int8)
         self.origin_x = 0
         self.origin_y = 0
 
         # timer callback update costmap
         update_costmap_period_s = 1
         rospy.Timer(rospy.Duration(update_costmap_period_s), self.update_costmap_callback)
+
+        # pub the costmap
+        self.costmap_publisher = rospy.Publisher("/costmap", OccupancyGrid, queue_size=1)
 
         rospy.loginfo("Planning node started !")
 
@@ -43,9 +44,9 @@ class Costmap_node:
 
     def receive_estimate_pose(self, msg):
         # get estimated position
-        self.current_pose = np.array([msg.pose.pose.position.x,
-                                    msg.pose.pose.position.y,
-                                     atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w) * 2])
+        self.current_pose = np.array([msg.pose.position.x,
+                                    msg.pose.position.y,
+                                     atan2(msg.pose.orientation.z, msg.pose.orientation.w) * 2])
 
 
     def update_costmap_callback(self, _):
@@ -60,7 +61,7 @@ class Costmap_node:
             grid_y = int((y - self.origin_y) / self.resolution + self.costmap_size // 2)
 
             if 0 <= grid_x < self.costmap_size and 0 <= grid_y < self.costmap_size:
-                self.obstacle_layer[grid_y, grid_x] = 100  # Mark the cell as occupied
+                self.costmap[grid_y, grid_x] = 100  # Mark the cell as occupied
 
 
         # publish the costmap
@@ -82,7 +83,6 @@ class Costmap_node:
         self.costmap_publisher.publish(costmap_msg)
 
 
-period = 0.2 # seconds
 
 if __name__ == "__main__":
     node = Costmap_node()
