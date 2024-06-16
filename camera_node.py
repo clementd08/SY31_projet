@@ -3,10 +3,11 @@
 import rospy
 import numpy as np
 import cv2
+import tf2_ros
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CameraInfo, LaserScan
 from visualization_msgs.msg import MarkerArray, Marker
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TransformStamped
 from math import cos, sin, atan2
 from geometry_msgs.msg import Point
 
@@ -23,9 +24,9 @@ class CameraNode:
         self.pub_img = rospy.Publisher('~output', Image, queue_size=1)
         self.pub_cylinders = rospy.Publisher('/cylinders', MarkerArray, queue_size=10)
 
-        # sub to the current position
-        self.estimate_pose_subscriber = rospy.Subscriber("/estimate_pose", PoseStamped, self.receive_estimate_pose)
-        self.current_pose = np.array([0., 0., 0.]) # x, y, theta
+        # # sub to the current position
+        # self.estimate_pose_subscriber = rospy.Subscriber("/estimate_pose", PoseStamped, self.receive_estimate_pose)
+        # self.current_pose = np.array([0., 0., 0.]) # x, y, theta
         
         self.last_distance = 1
         self.range_min = 0.25
@@ -43,16 +44,16 @@ class CameraNode:
         self.subscriber_info = rospy.Subscriber('/image', Image, self.image_callback)
 
         # Initialize transform broadcaster
-        self.tf_broadcaster = tf2_ros.StaticTransformBroadcaster()
-        self.publish_static_transform()
+        # self.tf_broadcaster = tf2_ros.StaticTransformBroadcaster()
+        # self.publish_static_transform()
         
         rospy.loginfo("camera node started !")
 
-    def receive_estimate_pose(self, msg):
-        # get estimated position
-        self.current_pose = np.array([msg.pose.position.x,
-                                    msg.pose.position.y,
-                                     atan2(msg.pose.orientation.z, msg.pose.orientation.w) * 2])
+    # def receive_estimate_pose(self, msg):
+    #     # get estimated position
+    #     self.current_pose = np.array([msg.pose.position.x,
+    #                                 msg.pose.position.y,
+    #                                  atan2(msg.pose.orientation.z, msg.pose.orientation.w) * 2])
                                      
     def distance_wall(self, msg):
         self.last_distance = msg.ranges[0]
@@ -156,24 +157,23 @@ class CameraNode:
 
 
     
-    def publish_static_transform(self):
-        static_transform = TransformStamped()
-        static_transform.header.stamp = rospy.Time.now()
-        static_transform.header.frame_id = "base_link"
-        static_transform.child_frame_id = "turtlebotcam"
-        static_transform.transform.translation.x = 0.1
-        static_transform.transform.translation.y = 0.0
-        static_transform.transform.translation.z = 0.2
-        static_transform.transform.rotation.x = 0.0
-        static_transform.transform.rotation.y = 0.0
-        static_transform.transform.rotation.z = 0.0
-        static_transform.transform.rotation.w = 1.0
-        self.tf_broadcaster.sendTransform(static_transform)
+    # def publish_static_transform(self):
+    #     static_transform = TransformStamped()
+    #     static_transform.header.stamp = rospy.Time.now()
+    #     static_transform.header.frame_id = "base_link"
+    #     static_transform.child_frame_id = "turtlebotcam"
+    #     static_transform.transform.translation.x = 0.1
+    #     static_transform.transform.translation.y = 0.0
+    #     static_transform.transform.translation.z = 0.2
+    #     static_transform.transform.rotation.x = 0.0
+    #     static_transform.transform.rotation.y = 0.0
+    #     static_transform.transform.rotation.z = 0.0
+    #     static_transform.transform.rotation.w = 1.0
+    #     self.tf_broadcaster.sendTransform(static_transform)
 
     
     def cylinder_callback(self, msg):
         cylinders = MarkerArray()
-        x, y = self.current_pose[:2]
         radius = 0.05
 
         cylinder = Marker()
@@ -182,7 +182,7 @@ class CameraNode:
         self.id += 1
         cylinder.type = Marker.CYLINDER
         cylinder.action = Marker.ADD
-        cylinder.pose.position = Point(x, y, 0)
+        cylinder.pose.position = Point(0, 0, 0)
         cylinder.pose.orientation.w = 1
         cylinder.scale.x = cylinder.scale.y = 2 * radius
         cylinder.scale.z = 0.3
@@ -190,7 +190,7 @@ class CameraNode:
         cylinder.color.g = 0
         cylinder.color.b = self.color_b
         cylinder.color.a = 0.5
-        cylinder.lifetime = rospy.Duration(0.2)
+        cylinder.lifetime = rospy.Duration(600)
         cylinders.markers.append(cylinder)
 
         self.pub_cylinders.publish(cylinders)
@@ -231,4 +231,3 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
-

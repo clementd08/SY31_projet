@@ -69,6 +69,7 @@ class Costmap_node:
                     if 0 <= grid_x < self.costmap_size and 0 <= grid_y < self.costmap_size:
                         self.costmap[grid_y, grid_x] = 100  # Mark the cell as occupied
 
+        # print(self.current_pose[:2])
 
         # publish the costmap
         costmap_msg = OccupancyGrid()
